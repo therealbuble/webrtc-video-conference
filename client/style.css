@@ -1,0 +1,387 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+/* Page transitions */
+.page {
+    display: none;
+    min-height: 100vh;
+}
+
+.page.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Homepage styles */
+#home-page {
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.container {
+    background: white;
+    border-radius: 20px;
+    padding: 60px 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    color: #667eea;
+}
+
+.subtitle {
+    color: #666;
+    margin-bottom: 40px;
+    font-size: 1.1rem;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.btn {
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-secondary:hover {
+    background: #f0f2ff;
+    transform: translateY(-2px);
+}
+
+.btn-text {
+    background: transparent;
+    color: #666;
+}
+
+.btn-text:hover {
+    background: #f5f5f5;
+}
+
+.icon {
+    font-size: 1.3rem;
+}
+
+/* Join form */
+.join-form {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid #f0f0f0;
+}
+
+.join-form.hidden {
+    display: none;
+}
+
+.input {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 1rem;
+    margin-bottom: 15px;
+    transition: border-color 0.3s ease;
+}
+
+.input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Meeting page */
+#meeting-page {
+    background: #1a1a1a;
+}
+
+.meeting-header {
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.meeting-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.meeting-info h2 {
+    color: white;
+    font-size: 1.3rem;
+    margin: 0;
+}
+
+.btn-small {
+    padding: 8px 15px;
+    font-size: 0.9rem;
+    background: #667eea;
+    color: white;
+}
+
+.btn-small:hover {
+    background: #5568d3;
+}
+
+.meeting-controls {
+    display: flex;
+    gap: 15px;
+}
+
+.btn-control {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-control.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.btn-control.inactive {
+    background: rgba(255, 59, 48, 0.8);
+    color: white;
+}
+
+.btn-control.danger {
+    background: rgba(255, 59, 48, 0.9);
+    color: white;
+}
+
+.btn-control:hover {
+    transform: scale(1.1);
+}
+
+.btn-control.danger:hover {
+    background: rgba(255, 59, 48, 1);
+}
+
+/* Video grid */
+.video-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.video-container {
+    position: relative;
+    background: #000;
+    border-radius: 15px;
+    overflow: hidden;
+    aspect-ratio: 16/9;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.name-label {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Notifications */
+.notifications {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.notification {
+    background: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    font-weight: 500;
+    animation: slideIn 0.3s ease;
+    min-width: 250px;
+}
+
+.notification.success {
+    border-left: 4px solid #4caf50;
+}
+
+.notification.warning {
+    border-left: 4px solid #ff9800;
+}
+
+.notification.info {
+    border-left: 4px solid #2196f3;
+}
+
+.notification.fade-out {
+    animation: slideOut 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        padding: 40px 20px;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    .meeting-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .meeting-controls {
+        justify-content: center;
+    }
+
+    .video-grid {
+        grid-template-columns: 1fr;
+        padding: 10px;
+    }
+
+    .notifications {
+        right: 10px;
+        left: 10px;
+    }
+
+    .notification {
+        min-width: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .btn-control {
+        width: 45px;
+        height: 45px;
+        font-size: 1.3rem;
+    }
+
+    .meeting-controls {
+        gap: 10px;
+    }
+}
+
+/* Unsupported browser banner */
+.unsupported-banner {
+    background: #ff3b30;
+    color: white;
+    padding: 15px;
+    text-align: center;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 2000;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Enhanced notifications */
+.notification.error {
+    border-left: 4px solid #f44336;
+    background: #fff8f8;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

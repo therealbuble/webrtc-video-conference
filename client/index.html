@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Video Conference</title>
+    <meta name="description" content="A simple, secure WebRTC video conferencing application for up to 3 participants.">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Browser support warning -->
+    <noscript>
+        <div style="background: #ff3b30; color: white; padding: 20px; text-align: center; font-weight: bold;">
+            This application requires JavaScript to function. Please enable JavaScript in your browser.
+        </div>
+    </noscript>
+
+    <div id="unsupported-browser" class="unsupported-banner hidden">
+        Your browser does not support WebRTC features required for this app. Please use a modern browser like Chrome,
+        Firefox, or Edge.
+    </div>
+    <!-- Homepage -->
+    <div id="home-page" class="page active">
+        <div class="container">
+            <h1>WebRTC Video Conference</h1>
+            <p class="subtitle">Connect face-to-face with up to 3 participants</p>
+
+            <div class="button-group">
+                <button id="start-meeting-btn" class="btn btn-primary">
+                    <span class="icon">📹</span>
+                    Start Meeting
+                </button>
+
+                <button id="join-meeting-btn" class="btn btn-secondary">
+                    <span class="icon">🔗</span>
+                    Join Meeting
+                </button>
+            </div>
+
+            <!-- Join Meeting Form (hidden initially) -->
+            <div id="join-form" class="join-form hidden">
+                <input type="text" id="meeting-link-input" placeholder="Paste meeting link here" class="input" />
+                <input type="text" id="display-name-input" placeholder="Enter your name" class="input" maxlength="30" />
+                <div class="button-group">
+                    <button id="join-submit-btn" class="btn btn-primary">Join Now</button>
+                    <button id="join-cancel-btn" class="btn btn-text">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meeting Page -->
+    <div id="meeting-page" class="page">
+        <div class="meeting-header">
+            <div class="meeting-info">
+                <h2 id="room-title">Meeting Room</h2>
+                <button id="copy-link-btn" class="btn btn-small">📋 Copy Link</button>
+            </div>
+
+            <div class="meeting-controls">
+                <button id="toggle-mic-btn" class="btn-control active" title="Toggle Microphone">
+                    <span class="icon">🎤</span>
+                </button>
+                <button id="toggle-camera-btn" class="btn-control active" title="Toggle Camera">
+                    <span class="icon">📹</span>
+                </button>
+                <button id="end-call-btn" class="btn-control danger" title="End Call">
+                    <span class="icon">📞</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="video-grid" class="video-grid">
+            <!-- Videos will be added here dynamically -->
+        </div>
+
+        <div id="notifications" class="notifications"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
