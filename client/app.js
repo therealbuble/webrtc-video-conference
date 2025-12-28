@@ -1,17 +1,6 @@
 // Socket.io connection
 const socket = io();
 
-// Check browser support
-function checkBrowserSupport() {
-    const isSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.RTCPeerConnection);
-    if (!isSupported) {
-        document.getElementById('unsupported-browser').classList.remove('hidden');
-        alert('Your browser does not support WebRTC. Use Chrome, Firefox, or Edge.');
-        return false;
-    }
-    return true;
-}
-
 // WebRTC configuration
 const configuration = {
     iceServers: [
@@ -22,11 +11,14 @@ const configuration = {
 
 // State management
 let localStream = null;
+let processedAudioTrack = null;
 let peers = new Map(); // Map of userId -> { connection, stream, displayName }
 let currentRoomId = null;
 let displayName = 'Anonymous';
 let isMicEnabled = true;
 let isCameraEnabled = true;
+let isChatOpen = false;
+let unreadMessages = 0;
 
 // DOM elements
 const homePage = document.getElementById('home-page');
@@ -35,16 +27,24 @@ const startMeetingBtn = document.getElementById('start-meeting-btn');
 const joinMeetingBtn = document.getElementById('join-meeting-btn');
 const joinForm = document.getElementById('join-form');
 const meetingLinkInput = document.getElementById('meeting-link-input');
-const displayNameInput = document.getElementById('display-name-input');
 const joinSubmitBtn = document.getElementById('join-submit-btn');
 const joinCancelBtn = document.getElementById('join-cancel-btn');
 const copyLinkBtn = document.getElementById('copy-link-btn');
+const meetingLinkDisplay = document.getElementById('meeting-link-display');
 const toggleMicBtn = document.getElementById('toggle-mic-btn');
 const toggleCameraBtn = document.getElementById('toggle-camera-btn');
 const endCallBtn = document.getElementById('end-call-btn');
 const videoGrid = document.getElementById('video-grid');
 const roomTitle = document.getElementById('room-title');
 const notifications = document.getElementById('notifications');
+const toggleChatBtn = document.getElementById('toggle-chat-btn');
+const closeChatBtn = document.getElementById('close-chat-btn');
+const chatContainer = document.getElementById('chat-container');
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+const chatToSelect = document.getElementById('chat-to-select');
+const chatBadge = document.getElementById('chat-badge');
 
 // Utility functions
 function generateRoomId() {
@@ -53,7 +53,7 @@ function generateRoomId() {
 }
 
 function getRoomUrl(roomId) {
-    return `${window.location.origin}?room=${roomId}`;
+    return `${window.location.origin}/${roomId}`;
 }
 
 function showNotification(message, type = 'info') {
@@ -68,42 +68,78 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
+// Process audio stream using Web Audio API
+function processAudio(stream) {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        const destination = audioContext.createMediaStreamDestination();
+
+        // Highpass filter to remove low frequency noise (rumble, fans)
+        const highpass = audioContext.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.value = 100; // Cutoff frequency 100Hz
+
+        // Compressor to even out volume levels and prevent clipping
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.value = -50;
+        compressor.knee.value = 40;
+        compressor.ratio.value = 12;
+        compressor.attack.value = 0;
+        compressor.release.value = 0.25;
+
+        source.connect(highpass);
+        highpass.connect(compressor);
+        compressor.connect(destination);
+
+        return destination.stream.getAudioTracks()[0];
+    } catch (e) {
+        console.error('Web Audio API not supported or error:', e);
+        return stream.getAudioTracks()[0];
+    }
+}
+
 // Initialize local media stream
 async function initLocalStream() {
     try {
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-        }
-
         localStream = await navigator.mediaDevices.getUserMedia({
             video: {
                 width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'user'
+                height: { ideal: 720 }
             },
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: true
+                autoGainControl: true,
+                googAutoGainControl: true,
+                googNoiseSuppression: true,
+                googHighpassFilter: true
             }
         });
+
+        // Initialize processed audio track
+        if (localStream.getAudioTracks().length > 0) {
+            try {
+                processedAudioTrack = processAudio(localStream);
+                console.log('Audio processing initialized successfully');
+            } catch (err) {
+                console.error('Failed to initialize audio processing:', err);
+            }
+        }
 
         addVideoStream('local', localStream, 'You (Me)', true);
         return true;
     } catch (error) {
         console.error('Error accessing media devices:', error);
-        let errorMsg = 'Unable to access camera/microphone.';
-
+        let errorMessage = 'Unable to access camera/microphone.';
         if (error.name === 'NotAllowedError') {
-            errorMsg += ' Please grant permission when prompted.';
+            errorMessage += ' Please allow permissions in your browser settings.';
         } else if (error.name === 'NotFoundError') {
-            errorMsg += ' No camera or microphone found.';
-        } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-            errorMsg += ' WebRTC requires HTTPS or localhost.';
+            errorMessage += ' No camera or microphone found.';
+        } else if (error.name === 'NotReadableError') {
+            errorMessage += ' Hardware is already in use by another application.';
         }
-
-        showNotification(errorMsg, 'error');
-        alert(errorMsg);
+        alert(errorMessage);
         return false;
     }
 }
@@ -146,15 +182,125 @@ function removeVideoStream(userId) {
     }
 }
 
+// Handle incoming chat message
+socket.on('chat-message', ({ message, from, displayName, timestamp, isPrivate }) => {
+    appendMessage(message, from, displayName, timestamp, isPrivate);
+
+    if (!isChatOpen) {
+        unreadMessages++;
+        chatBadge.textContent = unreadMessages;
+        chatBadge.classList.remove('hidden');
+        showNotification(
+            `New ${isPrivate ? 'private ' : ''}message from ${from === socket.id ? 'Me' : displayName}`,
+            'info'
+        );
+    }
+});
+
+// Append message to chat
+function appendMessage(message, from, displayName, timestamp, isPrivate) {
+    const isLocal = from === socket.id;
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${isLocal ? 'outgoing' : 'incoming'} ${isPrivate ? 'private' : ''}`;
+
+    const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let metaText = isLocal ? 'You' : displayName;
+    if (isPrivate) {
+        metaText += ' (Private)';
+    }
+
+    msgDiv.innerHTML = `
+        <div class="meta">${metaText}</div>
+        ${message}
+        <div class="time">${time}</div>
+    `;
+
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Send chat message
+function sendChatMessage() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    const to = chatToSelect.value; // Empty string for Everyone, or userId
+
+    socket.emit('chat-message', {
+        message,
+        to,
+        timestamp: Date.now()
+    });
+
+    chatInput.value = '';
+}
+
+// Update chat participants dropdown
+function updateChatParticipants() {
+    // Save current selection
+    const currentSelection = chatToSelect.value;
+
+    // Clear options except "Everyone"
+    chatToSelect.innerHTML = '<option value="">Everyone</option>';
+
+    // Add current peers
+    for (const [userId, peer] of peers) {
+        const option = document.createElement('option');
+        option.value = userId;
+        option.textContent = peer.displayName;
+        chatToSelect.appendChild(option);
+    }
+
+    // Restore selection if possible, otherwise default to everyone
+    if (currentSelection && peers.has(currentSelection)) {
+        chatToSelect.value = currentSelection;
+    } else {
+        chatToSelect.value = "";
+    }
+}
+
+// Toggle Chat
+function toggleChat() {
+    isChatOpen = !isChatOpen;
+    chatContainer.classList.toggle('hidden', !isChatOpen);
+
+    if (isChatOpen) {
+        unreadMessages = 0;
+        chatBadge.classList.add('hidden');
+        chatBadge.textContent = '';
+        setTimeout(() => chatInput.focus(), 300);
+    }
+}
+
 // Create peer connection
 function createPeerConnection(userId, displayName) {
     const peerConnection = new RTCPeerConnection(configuration);
 
     // Add local stream tracks to peer connection
     if (localStream) {
-        localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
-        });
+        try {
+            // Add video track
+            localStream.getVideoTracks().forEach(track => {
+                console.log(`Adding video track: ${track.id}`);
+                peerConnection.addTrack(track, localStream);
+            });
+
+            // Add processed audio track if available, otherwise original
+            if (processedAudioTrack) {
+                console.log('Adding processed audio track');
+                peerConnection.addTrack(processedAudioTrack, localStream);
+            } else {
+                console.log('Adding original audio track (no processing)');
+                localStream.getAudioTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+            }
+        } catch (err) {
+            console.error('Error adding tracks to peer connection:', err);
+        }
+    } else {
+        console.warn('No local stream to add to peer connection');
     }
 
     // Handle ICE candidates
@@ -169,9 +315,16 @@ function createPeerConnection(userId, displayName) {
 
     // Handle remote stream
     peerConnection.ontrack = (event) => {
+        console.log(`Received remote track from ${userId}:`, event.track.kind, event.streams[0]?.id);
         const [remoteStream] = event.streams;
 
-        if (!peers.get(userId).stream) {
+        if (!remoteStream) {
+            console.warn('Received track with no streams!');
+            return;
+        }
+
+        if (!peers.get(userId).stream || peers.get(userId).stream.id !== remoteStream.id) {
+            console.log(`Setting remote stream for ${userId}`);
             peers.get(userId).stream = remoteStream;
             addVideoStream(userId, remoteStream, displayName);
         }
@@ -180,6 +333,7 @@ function createPeerConnection(userId, displayName) {
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
         console.log(`Connection state with ${userId}:`, peerConnection.connectionState);
+        console.log(`ICE Connection state with ${userId}:`, peerConnection.iceConnectionState);
 
         if (peerConnection.connectionState === 'failed' ||
             peerConnection.connectionState === 'disconnected') {
@@ -201,10 +355,11 @@ async function startMeeting() {
     await joinRoom(roomId);
 }
 
-// Join meeting from link
+// Join meeting from link - ENHANCED VERSION
 async function joinMeetingFromLink() {
     const link = meetingLinkInput.value.trim();
-    const name = displayNameInput.value.trim();
+    const nameInput = document.getElementById('display-name-input');
+    const name = nameInput ? nameInput.value.trim() : '';
 
     if (!link) {
         alert('Please enter a meeting link');
@@ -216,12 +371,39 @@ async function joinMeetingFromLink() {
         return;
     }
 
-    // Extract room ID from URL
-    const url = new URL(link);
-    const roomId = url.searchParams.get('room');
+    // Extract room ID from URL - supports both query param and path-based URLs
+    let roomId;
+    try {
+        const url = new URL(link);
 
-    if (!roomId) {
+        // Try query parameter first (e.g., ?room=abc123)
+        roomId = url.searchParams.get('room');
+
+        // If no query param, extract from path (e.g., /abc123)
+        if (!roomId) {
+            const path = url.pathname;
+            roomId = path.substring(1); // Remove leading '/'
+        }
+    } catch (e) {
+        // If URL parsing fails, treat the input as a room ID directly
+        roomId = link;
+    }
+
+    if (!roomId || roomId === '') {
         alert('Invalid meeting link');
+        return;
+    }
+
+    displayName = name;
+    await joinRoom(roomId);
+}
+
+// NEW: Quick join function for direct link clicks
+async function quickJoinFromUrl(roomId) {
+    const name = prompt('Enter your display name to join the meeting:', 'Anonymous');
+    if (!name) {
+        // User cancelled, go back to home
+        window.history.pushState({}, '', '/');
         return;
     }
 
@@ -244,7 +426,13 @@ async function joinRoom(roomId) {
 
     // Update URL without reload
     const newUrl = getRoomUrl(roomId);
-    window.history.pushState({ roomId }, '', newUrl);
+    window.history.pushState({ path: newUrl }, '', newUrl);
+
+    // Update link display
+    if (meetingLinkDisplay) {
+        meetingLinkDisplay.href = newUrl;
+        meetingLinkDisplay.textContent = newUrl;
+    }
 
     // Join room via socket
     socket.emit('join-room', { roomId, displayName });
@@ -266,8 +454,12 @@ async function createOffer(userId, displayName) {
         peers.set(userId, {
             connection: peerConnection,
             stream: null,
-            displayName
+            displayName,
+            iceCandidateQueue: []
         });
+
+        // Update chat dropdown
+        updateChatParticipants();
 
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
@@ -290,8 +482,12 @@ socket.on('offer', async ({ offer, from, displayName }) => {
         peers.set(from, {
             connection: peerConnection,
             stream: null,
-            displayName
+            displayName,
+            iceCandidateQueue: []
         });
+
+        // Update chat dropdown
+        updateChatParticipants();
 
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
 
@@ -302,6 +498,16 @@ socket.on('offer', async ({ offer, from, displayName }) => {
             answer,
             to: from
         });
+
+        // Process queued ICE candidates (since we just set remote description)
+        const peer = peers.get(from);
+        if (peer && peer.iceCandidateQueue && peer.iceCandidateQueue.length > 0) {
+            console.log(`Processing ${peer.iceCandidateQueue.length} queued ICE candidates from ${from}`);
+            for (const candidate of peer.iceCandidateQueue) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+            peer.iceCandidateQueue = [];
+        }
     } catch (error) {
         console.error('Error handling offer:', error);
     }
@@ -315,6 +521,15 @@ socket.on('answer', async ({ answer, from }) => {
         const peer = peers.get(from);
         if (peer && peer.connection) {
             await peer.connection.setRemoteDescription(new RTCSessionDescription(answer));
+
+            // Process queued ICE candidates
+            if (peer.iceCandidateQueue && peer.iceCandidateQueue.length > 0) {
+                console.log(`Processing ${peer.iceCandidateQueue.length} queued ICE candidates from ${from}`);
+                for (const candidate of peer.iceCandidateQueue) {
+                    await peer.connection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                peer.iceCandidateQueue = [];
+            }
         }
     } catch (error) {
         console.error('Error handling answer:', error);
@@ -326,7 +541,12 @@ socket.on('ice-candidate', async ({ candidate, from }) => {
     try {
         const peer = peers.get(from);
         if (peer && peer.connection) {
-            await peer.connection.addIceCandidate(new RTCIceCandidate(candidate));
+            if (peer.connection.remoteDescription) {
+                await peer.connection.addIceCandidate(new RTCIceCandidate(candidate));
+            } else {
+                console.log(`Queueing ICE candidate from ${from} (remote description not set)`);
+                peer.iceCandidateQueue.push(candidate);
+            }
         }
     } catch (error) {
         console.error('Error adding ICE candidate:', error);
@@ -353,6 +573,9 @@ function handleUserLeft(userId, displayName) {
             peer.connection.close();
         }
         peers.delete(userId);
+
+        // Update chat dropdown
+        updateChatParticipants();
     }
 
     removeVideoStream(userId);
@@ -371,13 +594,15 @@ function toggleMicrophone() {
         const audioTrack = localStream.getAudioTracks()[0];
         if (audioTrack) {
             isMicEnabled = !isMicEnabled;
+            // Toggle both original and processed tracks
             audioTrack.enabled = isMicEnabled;
+            if (processedAudioTrack) {
+                processedAudioTrack.enabled = isMicEnabled;
+            }
 
             toggleMicBtn.classList.toggle('active', isMicEnabled);
             toggleMicBtn.classList.toggle('inactive', !isMicEnabled);
-
-            toggleMicBtn.querySelector('.mic-on').classList.toggle('hidden', !isMicEnabled);
-            toggleMicBtn.querySelector('.mic-off').classList.toggle('hidden', isMicEnabled);
+            toggleMicBtn.querySelector('.icon').textContent = isMicEnabled ? '🎤' : '🎤❌';
         }
     }
 }
@@ -392,9 +617,7 @@ function toggleCamera() {
 
             toggleCameraBtn.classList.toggle('active', isCameraEnabled);
             toggleCameraBtn.classList.toggle('inactive', !isCameraEnabled);
-
-            toggleCameraBtn.querySelector('.cam-on').classList.toggle('hidden', isCameraEnabled);
-            toggleCameraBtn.querySelector('.cam-off').classList.toggle('hidden', !isCameraEnabled);
+            toggleCameraBtn.querySelector('.icon').textContent = isCameraEnabled ? '📹' : '📹❌';
         }
     }
 }
@@ -414,6 +637,7 @@ function leaveMeeting() {
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
+        processedAudioTrack = null;
     }
 
     // Remove local video
@@ -430,7 +654,8 @@ function leaveMeeting() {
     homePage.classList.add('active');
     joinForm.classList.add('hidden');
     meetingLinkInput.value = '';
-    displayNameInput.value = '';
+    const nameInput = document.getElementById('display-name-input');
+    if (nameInput) nameInput.value = '';
 
     // Reset URL
     window.history.pushState({}, '', '/');
@@ -442,6 +667,14 @@ function leaveMeeting() {
     toggleMicBtn.classList.remove('inactive');
     toggleCameraBtn.classList.add('active');
     toggleCameraBtn.classList.remove('inactive');
+
+    // Reset Chat
+    isChatOpen = false;
+    chatContainer.classList.add('hidden');
+    unreadMessages = 0;
+    chatBadge.classList.add('hidden');
+    chatMessages.innerHTML = '';
+    updateChatParticipants();
 }
 
 // Copy meeting link
@@ -466,7 +699,8 @@ joinMeetingBtn.addEventListener('click', () => {
 joinCancelBtn.addEventListener('click', () => {
     joinForm.classList.add('hidden');
     meetingLinkInput.value = '';
-    displayNameInput.value = '';
+    const nameInput = document.getElementById('display-name-input');
+    if (nameInput) nameInput.value = '';
 });
 
 joinSubmitBtn.addEventListener('click', joinMeetingFromLink);
@@ -476,18 +710,23 @@ toggleMicBtn.addEventListener('click', toggleMicrophone);
 toggleCameraBtn.addEventListener('click', toggleCamera);
 endCallBtn.addEventListener('click', leaveMeeting);
 
-// Handle page load with room parameter
+// Chat listeners
+toggleChatBtn.addEventListener('click', toggleChat);
+closeChatBtn.addEventListener('click', toggleChat);
+sendBtn.addEventListener('click', sendChatMessage);
+chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+});
+
+// ENHANCED: Handle page load with room parameter - Auto-join functionality
 window.addEventListener('load', () => {
-    if (!checkBrowserSupport()) return;
+    // Extract room ID from path (e.g., /room-id)
+    const path = window.location.pathname;
+    const roomId = path.substring(1); // Remove leading '/'
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get('room');
-
-    if (roomId) {
-        // Show join form pre-filled
-        joinForm.classList.remove('hidden');
-        meetingLinkInput.value = window.location.href;
-        displayNameInput.focus();
+    if (roomId && roomId !== '') {
+        // Auto-join with prompt for name
+        quickJoinFromUrl(roomId);
     }
 });
 

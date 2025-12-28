@@ -4,66 +4,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebRTC Video Conference | Secure Video Calls</title>
-    <meta name="description"
-        content="Connect face-to-face with AuraMeet, a premium, secure WebRTC video conferencing application.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <title>WebRTC Video Conference</title>
+    <link rel="stylesheet" href="/style.css">
 </head>
 
 <body>
-    <!-- Browser support warning -->
-    <noscript>
-        <div style="background: #ff3b30; color: white; padding: 20px; text-align: center; font-weight: bold;">
-            This application requires JavaScript to function. Please enable JavaScript in your browser.
-        </div>
-    </noscript>
-
-    <div id="unsupported-browser" class="unsupported-banner hidden">
-        <i data-lucide="alert-triangle"></i>
-        Your browser does not support WebRTC features required for this app. Please use Chrome, Firefox, or Edge.
-    </div>
-
-    <!-- Background Elements -->
-    <div class="mesh-background"></div>
-    <div class="glass-overlay"></div>
-
     <!-- Homepage -->
     <div id="home-page" class="page active">
-        <div class="container glass">
-            <div class="logo">
-                <i data-lucide="video" class="logo-icon"></i>
-                <h1>Video Conference</h1>
-            </div>
-            <p class="subtitle">Next-generation face-to-face connection</p>
+        <div class="container">
+            <h1>WebRTC Video Conference</h1>
+            <p class="subtitle">Connect face-to-face with up to 3 participants</p>
 
             <div class="button-group">
                 <button id="start-meeting-btn" class="btn btn-primary">
-                    <i data-lucide="plus-circle"></i>
+                    <span class="icon">📹</span>
                     Start Meeting
                 </button>
 
                 <button id="join-meeting-btn" class="btn btn-secondary">
-                    <i data-lucide="link"></i>
+                    <span class="icon">🔗</span>
                     Join Meeting
                 </button>
             </div>
 
             <!-- Join Meeting Form (hidden initially) -->
             <div id="join-form" class="join-form hidden">
-                <div class="input-wrapper">
-                    <i data-lucide="link-2" class="input-icon"></i>
-                    <input type="text" id="meeting-link-input" placeholder="Paste meeting link here" class="input" />
-                </div>
-                <div class="input-wrapper">
-                    <i data-lucide="user" class="input-icon"></i>
-                    <input type="text" id="display-name-input" placeholder="Enter your name" class="input"
-                        maxlength="30" />
-                </div>
-                <div class="button-group horizontal">
+                <input type="text" id="meeting-link-input" placeholder="Paste meeting link here" class="input" />
+                <input type="text" id="display-name-input" placeholder="Enter your name" class="input" maxlength="30" />
+                <div class="button-group">
                     <button id="join-submit-btn" class="btn btn-primary">Join Now</button>
                     <button id="join-cancel-btn" class="btn btn-text">Cancel</button>
                 </div>
@@ -73,29 +41,28 @@
 
     <!-- Meeting Page -->
     <div id="meeting-page" class="page">
-        <div class="meeting-header glass">
+        <div class="meeting-header">
             <div class="meeting-info">
-                <div class="room-tag">
-                    <i data-lucide="hash" size="14"></i>
-                    <span id="room-title">Meeting Room</span>
+                <h2 id="room-title">Meeting Room</h2>
+                <div class="meeting-link-container">
+                    <a id="meeting-link-display" href="#" target="_blank" class="meeting-link">Waiting for link...</a>
+                    <button id="copy-link-btn" class="btn btn-small" title="Copy to clipboard">📋</button>
                 </div>
-                <button id="copy-link-btn" class="btn btn-small glass-button">
-                    <i data-lucide="copy" size="16"></i>
-                    <span>Copy Link</span>
-                </button>
             </div>
 
             <div class="meeting-controls">
                 <button id="toggle-mic-btn" class="btn-control active" title="Toggle Microphone">
-                    <i data-lucide="mic" class="mic-on"></i>
-                    <i data-lucide="mic-off" class="mic-off hidden"></i>
+                    <span class="icon">🎤</span>
                 </button>
                 <button id="toggle-camera-btn" class="btn-control active" title="Toggle Camera">
-                    <i data-lucide="video" class="cam-on"></i>
-                    <i data-lucide="video-off" class="cam-off hidden"></i>
+                    <span class="icon">📹</span>
                 </button>
                 <button id="end-call-btn" class="btn-control danger" title="End Call">
-                    <i data-lucide="phone-off"></i>
+                    <span class="icon">📞</span>
+                </button>
+                <button id="toggle-chat-btn" class="btn-control" title="Toggle Chat">
+                    <span class="icon">💬</span>
+                    <span id="chat-badge" class="badge hidden"></span>
                 </button>
             </div>
         </div>
@@ -104,21 +71,31 @@
             <!-- Videos will be added here dynamically -->
         </div>
 
+        <!-- Chat Container -->
+        <div id="chat-container" class="chat-container hidden">
+            <div class="chat-header">
+                <h3>Chat</h3>
+                <button id="close-chat-btn" class="btn-text">✕</button>
+            </div>
+            <div id="chat-messages" class="chat-messages">
+                <!-- Messages will appear here -->
+            </div>
+            <div class="chat-input-area">
+                <select id="chat-to-select" class="chat-select">
+                    <option value="">Everyone</option>
+                </select>
+                <div class="input-wrapper">
+                    <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                    <button id="send-btn" class="btn-send">➤</button>
+                </div>
+            </div>
+        </div>
+
         <div id="notifications" class="notifications"></div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
-    <script>
-        // Initialize Lucide icons
-        lucide.createIcons();
-
-        // Custom observer to handle dynamically added icons if needed
-        const observer = new MutationObserver(() => {
-            lucide.createIcons();
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-    </script>
+    <script src="/app.js"></script>
 </body>
 
 </html>

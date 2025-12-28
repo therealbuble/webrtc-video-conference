@@ -15,6 +15,11 @@ const io = socketIo(server, {
 // Serve static files from client directory
 app.use(express.static(path.join(__dirname, '../client')));
 
+// SPA routing - serve index.html for all non-file routes
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
+});
+
 // Store room information
 const rooms = new Map();
 
@@ -96,6 +101,31 @@ io.on('connection', (socket) => {
             candidate,
             from: socket.id
         });
+    });
+
+    // Handle chat message
+    socket.on('chat-message', ({ message, to, timestamp }) => {
+        console.log(`Chat message from ${socket.displayName} to ${to || 'everyone'}: ${message}`);
+
+        const payload = {
+            message,
+            from: socket.id,
+            displayName: socket.displayName,
+            timestamp: timestamp || Date.now(),
+            isPrivate: !!to
+        };
+
+        if (to) {
+            // Private message
+            io.to(to).emit('chat-message', payload);
+            // Also send back to sender so they see their own private message
+            socket.emit('chat-message', payload);
+        } else {
+            // Public message to room
+            if (socket.roomId) {
+                io.to(socket.roomId).emit('chat-message', payload);
+            }
+        }
     });
 
     // Handle disconnect
