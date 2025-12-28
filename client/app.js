@@ -375,7 +375,9 @@ function toggleMicrophone() {
 
             toggleMicBtn.classList.toggle('active', isMicEnabled);
             toggleMicBtn.classList.toggle('inactive', !isMicEnabled);
-            toggleMicBtn.querySelector('.icon').textContent = isMicEnabled ? '🎤' : '🎤❌';
+
+            toggleMicBtn.querySelector('.mic-on').classList.toggle('hidden', !isMicEnabled);
+            toggleMicBtn.querySelector('.mic-off').classList.toggle('hidden', isMicEnabled);
         }
     }
 }
@@ -390,7 +392,9 @@ function toggleCamera() {
 
             toggleCameraBtn.classList.toggle('active', isCameraEnabled);
             toggleCameraBtn.classList.toggle('inactive', !isCameraEnabled);
-            toggleCameraBtn.querySelector('.icon').textContent = isCameraEnabled ? '📹' : '📹❌';
+
+            toggleCameraBtn.querySelector('.cam-on').classList.toggle('hidden', isCameraEnabled);
+            toggleCameraBtn.querySelector('.cam-off').classList.toggle('hidden', !isCameraEnabled);
         }
     }
 }
