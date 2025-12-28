@@ -1,5 +1,26 @@
 // Socket.io connection
+// Socket.io connection
 const socket = io();
+
+// Debug: Log all errors
+window.onerror = function (msg, url, lineNo, columnNo, error) {
+    console.error('Global Error:', msg, 'Line:', lineNo, 'Col:', columnNo, 'Error:', error);
+    // Try to send error to server if possible, or just alert for now
+    // alert('Client Error: ' + msg); 
+    return false;
+};
+
+socket.on('disconnect', (reason) => {
+    console.warn('Socket disconnected:', reason);
+    if (reason === 'io server disconnect') {
+        // The disconnection was initiated by the server, you need to reconnect manually
+        alert('Disconnected by server. Reconnecting...');
+        socket.connect();
+    } else {
+        // The socket will automatically try to reconnect
+        console.log('Attempting to reconnect...');
+    }
+});
 
 // WebRTC configuration
 const configuration = {
@@ -584,6 +605,7 @@ function handleUserLeft(userId, displayName) {
 
 // Handle room full
 socket.on('room-full', () => {
+    console.warn('Received room-full event');
     alert('This meeting room is full (maximum 3 participants)');
     leaveMeeting();
 });
